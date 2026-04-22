@@ -1,0 +1,10 @@
+{
+  "_comment": "TTS pronunciation overrides. Word-boundary, case-sensitive match. Multi-word keys are matched first ('Lady Catherine' beats 'Catherine'). Add words on the LEFT that the TTS mispronounces; put a phonetic respelling on the RIGHT. Run after rendering a chapter — listen for weird pronunciations, jot them down, add here, render the next batch.",
+
+  "Bingley":   "BING-lee",
+  "Darcy":     "DAR-see",
+  "Wickham":   "WICK-um",
+  "Bennet":    "BEN-it",
+  "Pemberley": "PEM-ber-lee",
+  "Longbourn": "LONG-born"
+}

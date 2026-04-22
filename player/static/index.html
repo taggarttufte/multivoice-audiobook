@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Audiobook Player</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Library view -->
+    <section id="library-view">
+      <h1>Library</h1>
+      <div id="library-list" class="card-grid"></div>
+      <p class="hint">Books appear here when MP3s land in <code>voice/library/&lt;book_id&gt;/</code>.</p>
+    </section>
+
+    <!-- Player view -->
+    <section id="player-view" hidden>
+      <button id="back-to-library" class="link">&larr; Library</button>
+      <h1 id="book-title">—</h1>
+
+      <div class="layout">
+        <div class="left-col">
+          <div class="chapter-list-wrap">
+            <h3>Chapters</h3>
+            <ol id="chapter-list"></ol>
+          </div>
+          <div class="bookmarks-wrap">
+            <h3>Bookmarks</h3>
+            <ul id="bookmark-list"><li class="empty">none yet</li></ul>
+          </div>
+        </div>
+        <div class="text-wrap">
+          <h3>Read along</h3>
+          <div id="chapter-text">(no text)</div>
+        </div>
+      </div>
+
+      <audio id="audio" preload="metadata"></audio>
+    </section>
+  </div>
+
+  <!-- Sticky bottom player bar (visible only in player view) -->
+  <div class="player-bar" id="player-bar" hidden>
+    <div class="player-bar-inner">
+      <div class="meta">
+        <span id="chapter-label">Chapter —</span>
+        <span class="sep">·</span>
+        <span id="time-label">0:00 / 0:00</span>
+        <span class="sep">·</span>
+        <span id="speed-label">1.00×</span>
+      </div>
+
+      <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
+
+      <div class="controls">
+        <button id="prev-chap"  title="Previous chapter">⏮</button>
+        <button id="back-30"    title="Back 30 seconds">−30s</button>
+        <button id="play-pause" title="Play/pause" class="big">▶</button>
+        <button id="fwd-30"     title="Forward 30 seconds">+30s</button>
+        <button id="next-chap"  title="Next chapter">⏭</button>
+        <button id="bookmark"   title="Bookmark this position (B)" class="bookmark-btn">🔖</button>
+      </div>
+
+      <div class="speed-row">
+        <label>Speed
+          <input type="range" id="speed" min="0.5" max="4" step="0.05" value="1.0">
+          <span id="speed-value">1.00×</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/player.js"></script>
+</body>
+</html>

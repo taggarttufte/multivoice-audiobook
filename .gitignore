@@ -1,0 +1,47 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# --- Audio / book content (NEVER commit) ---
+*.epub
+*.pdf
+*.mp3
+*.wav
+*.m4b
+*.ogg
+*.flac
+*.opus
+*.aac
+
+# --- Runtime data: user libraries, caches, progress, bookmarks ---
+library/*/
+!library/.gitkeep
+tts_cache/*/
+!tts_cache/.gitkeep
+.progress.json
+.bookmarks.json
+
+# --- Per-book configs (may contain copyrighted character names) ---
+cast_*.json
+!cast.example.json
+pronunciations_*.json
+!pronunciations.example.json
+
+# --- Secrets ---
+.env
+*.key
+*.pem
+secrets.*
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+.DS_Store
