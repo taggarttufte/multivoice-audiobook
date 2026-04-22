@@ -45,16 +45,21 @@ from text_preprocess import preprocess_for_tts       # noqa: E402
 
 # (chapter_roman, out_name, max_chars_rendered, trim_seconds, description)
 SAMPLES = [
-    ("I",      "opening",  4500, 35, "Famous opening line + first Bennet dialogue"),
-    ("VI",     "lucas",    5500, 45, "Elizabeth, Darcy and Bingley at Lucas Lodge"),
-    ("XXXIV",  "proposal", 6500, 60, "Darcy's first proposal"),
+    ("I",      "opening",  6000, 75, "Famous opening line + Mr./Mrs. Bennet dialogue"),
+    ("VI",     "lucas",    6500, 60, "Elizabeth, Darcy and Bingley at Lucas Lodge"),
+    ("XXXIV",  "proposal", 7000, 75, "Darcy's first proposal"),
 ]
 
 MAJOR_OVERRIDES = {
-    "Elizabeth": {"gender": "F", "voice": "eve"},
-    "Darcy":     {"gender": "M", "voice": "rex"},
-    "Jane":      {"gender": "F", "voice": "ara"},
-    "Bingley":   {"gender": "M", "voice": "leo"},
+    "Elizabeth":   {"gender": "F", "voice": "eve"},
+    "Darcy":       {"gender": "M", "voice": "rex"},
+    "Mr. Darcy":   {"gender": "M", "voice": "rex"},  # how Austen most often names him
+    "Jane":        {"gender": "F", "voice": "ara"},
+    "Bingley":     {"gender": "M", "voice": "leo"},
+    "Mr. Bingley": {"gender": "M", "voice": "leo"},
+    # Bennet parents — only the parents in this novel; daughters use given names.
+    "Mr. Bennet":  {"gender": "M", "voice": "leo"},
+    "Mrs. Bennet": {"gender": "F", "voice": "ara"},
 }
 
 
@@ -115,8 +120,7 @@ def build_cast(full_text: str) -> dict:
 def render_segments_to_bytes(text: str, cast: dict, api_key: str,
                              parallel: int = 6) -> bytes:
     """Attribute -> voice-map -> parallel TTS -> ffmpeg concat -> return bytes."""
-    known = list(cast["characters"].keys())
-    segments = attribute(text, known)
+    segments = attribute(text, cast)
 
     flat: list[tuple[str, str]] = []
     for seg in segments:

@@ -231,8 +231,8 @@ def render_chapter_multi_voice(
 ) -> tuple[Path, int]:
     """Attribute, voice-map, render each segment, concat. Saves
     chapter_NNN.attribution.json next to the audio for inspection."""
-    known_chars = list(cast.get("characters", {}).keys())
-    segments = attribute(text, known_chars)
+    # Pass the full cast so attribute() can do gender-based pronoun resolution.
+    segments = attribute(text, cast)
 
     s = attribution_stats(segments)
     print(f"[ch{chapter_num:03d}] {s['total']} segments  conf={s['by_conf']}")
