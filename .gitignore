@@ -17,6 +17,8 @@ venv/
 *.flac
 *.opus
 *.aac
+# Allow short demo clips generated from public-domain sources
+!demos/*.mp3
 
 # --- Runtime data: user libraries, caches, progress, bookmarks ---
 library/*/
