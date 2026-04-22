@@ -323,3 +323,31 @@ input[type="range"]::-moz-range-thumb {
 }
 #speed::-webkit-slider-thumb { background: var(--warm); box-shadow: 0 0 0 1px var(--warm-soft); }
 #speed::-moz-range-thumb     { background: var(--warm); }
+
+/* --- Mobile / narrow-screen layout --- */
+@media (max-width: 720px) {
+  body {
+    padding: 12px 12px 240px;     /* slimmer side padding, more room above sticky bar */
+  }
+  h1 { font-size: 18px; }
+  .card-grid { grid-template-columns: 1fr; }
+
+  /* Stack the chapter list / bookmarks / read-along vertically */
+  .layout { grid-template-columns: 1fr; }
+  .chapter-list-wrap { max-height: 30vh; }
+  .bookmarks-wrap   { max-height: 25vh; }
+  .text-wrap        { max-height: 50vh; }
+
+  /* Player bar: tighter padding + smaller controls */
+  .player-bar { padding: 10px 12px; }
+  .player-bar-inner { gap: 8px; }
+  .player-bar .meta { font-size: 12px; }
+  .controls { gap: 6px; }
+  button { padding: 7px 10px; font-size: 13px; }
+  button.big { padding: 9px 16px; font-size: 18px; }
+  #speed { width: 180px; }
+  .speed-row { font-size: 12px; }
+  /* Touch-friendly: bigger slider thumbs on touch devices */
+  input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -8px; }
+  input[type="range"]::-moz-range-thumb     { width: 22px; height: 22px; }
+}

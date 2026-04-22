@@ -113,6 +113,24 @@ python player/app.py
 
 Open <http://localhost:5000>.
 
+**Access from phone / other devices** — bind to all interfaces:
+
+```bash
+python player/app.py --host 0.0.0.0
+```
+
+Then visit `http://<your-machine-ip>:5000` from any device on the same wifi.
+For access from outside your home network, [Tailscale](https://tailscale.com/)
+is the cleanest option — install it on your Windows machine and your phone,
+then use the tailnet IP or MagicDNS name.
+
+The UI is mobile-responsive (stacked layout on narrow screens, touch-friendly
+controls); adding the player to your iOS/Android home screen works like a
+standalone app.
+
+> **Security note:** `0.0.0.0` has no auth — anyone on your network can see
+> your library and bookmarks. Fine at home; not on shared wifi.
+
 ## Voice options
 
 Five Grok voices are exposed:

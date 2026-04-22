@@ -304,5 +304,15 @@ def api_bookmark_delete(book_id, idx):
 
 
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="bind address. 127.0.0.1 = local only (default); "
+                         "0.0.0.0 = exposed to your LAN")
+    ap.add_argument("--port", type=int, default=5000)
+    args = ap.parse_args()
     print(f"Library: {LIBRARY_DIR}")
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    if args.host == "0.0.0.0":
+        print("WARNING: serving on all interfaces. Anyone on your network can")
+        print("         see your library and bookmarks. Use only on trusted wifi.")
+    app.run(host=args.host, port=args.port, debug=False)
