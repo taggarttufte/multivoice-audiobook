@@ -1,80 +1,212 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0d0f14">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Audiobook Player</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=13">
 </head>
 <body>
-  <div id="app">
-    <!-- Library view -->
-    <section id="library-view">
-      <h1>Library</h1>
-      <div id="library-list" class="card-grid"></div>
-      <p class="hint">Books appear here when MP3s land in <code>voice/library/&lt;book_id&gt;/</code>.</p>
+<div class="app-shell" id="app">
+
+  <!-- ====== TOPBAR ====== -->
+  <header class="topbar">
+    <a class="nav-link active" id="nav-library" href="#library">Library</a>
+    <a class="nav-link" id="nav-player" href="#player">Now Playing</a>
+    <span class="crumbs" id="crumbs"></span>
+    <div class="spacer"></div>
+  </header>
+
+  <!-- ====== LIBRARY VIEW ====== -->
+  <main id="view-library" class="view">
+    <section class="library">
+      <div class="library-header">
+        <div>
+          <div class="eyebrow" style="margin-bottom:8px">Your Shelf</div>
+          <h1 id="library-title">Library</h1>
+          <p id="library-subtitle">Pick up where you left off, or start something new.</p>
+        </div>
+        <div class="library-filters" id="library-filters" role="tablist" aria-label="Filter library"></div>
+      </div>
+
+      <div class="book-grid" id="book-grid"></div>
+    </section>
+  </main>
+
+  <!-- ====== PLAYER VIEW ====== -->
+  <main id="view-player" class="view" hidden>
+
+    <!-- Now-playing fullscreen stage. Shown when body has .mode-now-playing. -->
+    <section class="np-stage" id="np-stage">
+      <div class="np-card">
+        <div class="np-cover" id="np-cover"></div>
+        <div class="np-meta">
+          <span class="np-author" id="np-author"></span>
+          <h1 class="np-title" id="np-title">—</h1>
+          <span class="np-chapter" id="np-chapter">—</span>
+        </div>
+      </div>
     </section>
 
-    <!-- Player view -->
-    <section id="player-view" hidden>
-      <button id="back-to-library" class="link">&larr; Library</button>
-      <h1 id="book-title">—</h1>
-
-      <div class="layout">
-        <div class="left-col">
-          <div class="chapter-list-wrap">
-            <h3>Chapters</h3>
-            <ol id="chapter-list"></ol>
-          </div>
-          <div class="bookmarks-wrap">
-            <h3>Bookmarks</h3>
-            <ul id="bookmark-list"><li class="empty">none yet</li></ul>
-          </div>
-        </div>
-        <div class="text-wrap">
-          <h3>Read along</h3>
-          <div id="chapter-text">(no text)</div>
-        </div>
-      </div>
-
-      <audio id="audio" preload="metadata"></audio>
+    <!-- Picture mode: scrolling collage of all chapter illustrations.
+         Chapters past the user's current position are spoiler-blocked. -->
+    <section class="pic-stage" id="pic-stage">
+      <div class="pic-scroll" id="pic-scroll"></div>
     </section>
-  </div>
 
-  <!-- Sticky bottom player bar (visible only in player view) -->
-  <div class="player-bar" id="player-bar" hidden>
-    <div class="player-bar-inner">
-      <div class="meta">
-        <span id="chapter-label">Chapter —</span>
-        <span class="sep">·</span>
-        <span id="time-label">0:00 / 0:00</span>
-        <span class="sep">·</span>
-        <span id="speed-label">1.00×</span>
+    <section class="player">
+      <!-- LEFT COLUMN -->
+      <aside class="sidecol">
+        <div class="panel">
+          <header>
+            <span class="title"><strong>Chapters</strong></span>
+            <span class="title" id="chapters-count">—</span>
+          </header>
+          <ul id="chapter-list"></ul>
+        </div>
+
+        <div class="panel">
+          <header>
+            <span class="title"><strong>Bookmarks</strong></span>
+            <span class="title" id="bookmark-count">0</span>
+          </header>
+          <ul id="bookmark-list"></ul>
+        </div>
+      </aside>
+
+      <!-- RIGHT COLUMN -->
+      <section class="readalong">
+        <div class="book-heading">
+          <span class="author" id="ra-author"></span>
+          <h1 id="ra-title">—</h1>
+          <span class="ch-label" id="ra-ch-label"></span>
+        </div>
+
+        <article id="chapter-text">(no text)</article>
+      </section>
+    </section>
+  </main>
+
+  <!-- ====== STICKY PLAYER BAR ====== -->
+  <div id="player-bar" hidden>
+    <!-- Drag handle: tap to toggle, swipe down to collapse. -->
+    <button class="pb-handle" id="pb-handle" aria-label="Collapse player controls" aria-expanded="true" title="Hide controls">
+      <span class="grabber" aria-hidden="true"></span>
+    </button>
+    <div class="inner">
+
+      <!-- Row 1: meta -->
+      <div class="pb-meta">
+        <div class="chapter">
+          <span class="num" id="pb-ch-num">CH —</span>
+          <span class="name" id="pb-ch-name">—</span>
+        </div>
+        <!-- Mode segmented control: read-along / now-playing / picture. -->
+        <div class="mode-seg" role="tablist" aria-label="View mode">
+          <button class="mode-seg-btn" data-mode="read" role="tab" aria-label="Read along" title="Read along">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 5h7v14H4zM13 5h7v14h-7z"/>
+              <path d="M7 8h1M7 11h1M16 8h1M16 11h1"/>
+            </svg>
+            <span class="label">Read</span>
+          </button>
+          <button class="mode-seg-btn" data-mode="now-playing" role="tab" aria-label="Now playing" title="Now playing">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+            </svg>
+            <span class="label">Now</span>
+          </button>
+          <button class="mode-seg-btn" data-mode="picture" role="tab" aria-label="Pictures" title="Picture mode">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2"/>
+              <circle cx="9" cy="11" r="1.5" fill="currentColor"/>
+              <path d="M3 17l5-5 4 4 3-3 6 6"/>
+            </svg>
+            <span class="label">Pics</span>
+          </button>
+        </div>
       </div>
 
-      <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
+      <!-- Row 2: transport + seek -->
+      <div class="pb-transport">
+        <button class="icon-btn" id="skip-back" aria-label="Skip back 30 seconds" title="Skip back 30s">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
+            <text x="12" y="15" text-anchor="middle" font-size="7" font-family="ui-monospace,monospace" fill="currentColor" stroke="none" font-weight="700">30</text>
+          </svg>
+        </button>
 
-      <div class="controls">
-        <button id="prev-chap"  title="Previous chapter">⏮</button>
-        <button id="back-30"    title="Back 30 seconds">−30s</button>
-        <button id="play-pause" title="Play/pause" class="big">▶</button>
-        <button id="fwd-30"     title="Forward 30 seconds">+30s</button>
-        <button id="next-chap"  title="Next chapter">⏭</button>
-        <button id="bookmark"   title="Bookmark this position (B)" class="bookmark-btn">🔖</button>
+        <button id="play-btn" aria-label="Play">
+          <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.52.86l10.5-6.5a1 1 0 0 0 0-1.72L9.52 4.64A1 1 0 0 0 8 5.5z"/></svg>
+        </button>
+
+        <div class="pb-seek">
+          <span class="time" id="time-current">0:00</span>
+          <input id="seek-slider" type="range" min="0" max="1000" value="0" aria-label="Seek">
+          <span class="time" id="time-total">0:00</span>
+        </div>
+
+        <button class="icon-btn" id="skip-fwd" aria-label="Skip forward 30 seconds" title="Skip forward 30s">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>
+            <text x="12" y="15" text-anchor="middle" font-size="7" font-family="ui-monospace,monospace" fill="currentColor" stroke="none" font-weight="700">30</text>
+          </svg>
+        </button>
+
+        <button class="icon-btn" id="bookmark-btn" aria-label="Add bookmark" title="Bookmark (B)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 3h12v18l-6-4-6 4z"/>
+          </svg>
+        </button>
       </div>
 
-      <div class="speed-row">
-        <label>Speed
-          <input type="range" id="speed" min="0.5" max="4" step="0.05" value="1.0">
-          <span id="speed-value">1.00×</span>
-        </label>
+      <!-- Row 2b: progress mode toggle + speed-aware ETA -->
+      <div class="pb-seek-foot">
+        <button class="prog-mode" id="prog-mode" aria-label="Toggle chapter / book progress" title="Toggle chapter / book">Chapter</button>
+        <span class="eta" id="eta">—</span>
+      </div>
+
+      <!-- Row 3: speed -->
+      <div class="pb-speed">
+        <label for="speed-slider">Speed</label>
+        <input id="speed-slider" type="range" min="0.5" max="4" step="0.05" value="1" aria-label="Playback speed">
+        <span id="speed-value">1.00×</span>
+        <div class="presets" aria-label="Speed presets">
+          <button data-speed="1" class="active">1×</button>
+          <button data-speed="2">2×</button>
+          <button data-speed="2.7">2.7×</button>
+          <button data-speed="3">3×</button>
+          <button data-speed="3.2">3.2×</button>
+        </div>
+      </div>
+
+      <!-- Row 4: volume -->
+      <div class="pb-volume">
+        <label for="volume-slider">Volume</label>
+        <input id="volume-slider" type="range" min="0" max="100" step="1" value="100" aria-label="Playback volume">
+        <span id="volume-value">100%</span>
       </div>
     </div>
   </div>
 
-  <script src="/static/player.js"></script>
+  <!-- Pull tab: shown only when the player bar is collapsed. -->
+  <button class="pb-pulltab" id="pb-pulltab" hidden aria-label="Show player controls" title="Show controls">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 15 12 9 18 15"/>
+    </svg>
+    <span class="mini" id="pb-pulltab-mini">—</span>
+  </button>
+
+  <audio id="audio" preload="metadata"></audio>
+</div>
+
+<script src="/static/player.js?v=17"></script>
 </body>
 </html>

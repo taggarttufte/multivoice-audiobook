@@ -64,9 +64,165 @@ def get_xai_key() -> str:
 
 CHAPTER_FILE_RE = re.compile(r"chapter(\d+)", re.IGNORECASE)
 
+# Labels treated as front/back matter and skipped when numbering chapters.
+# These are wasted TTS spend (image-only or pure metadata).
+_SKIP_LABEL_PATTERNS = [
+    re.compile(p, re.IGNORECASE) for p in (
+        r"^cover\b", r"^insert\b", r"^title\s*page$", r"^frontispiece$",
+        r"^copyright(s)?\b", r"^copyrights?\s+and\s+credits$",
+        r"^table\s*of\s*contents( page)?$", r"^contents$",
+        r"^jnovels?$", r"^information$", r"^character\s+gallery$",
+        r"^(yen\s+)?newsletter\b",
+    )
+]
 
-def discover_chapters(epub_path: Path) -> dict[int, list[str]]:
-    """Return {chapter_number: [xhtml_filenames in sort order]}."""
+
+def _is_front_matter(label: str) -> bool:
+    s = (label or "").strip()
+    return any(p.match(s) for p in _SKIP_LABEL_PATTERNS)
+
+
+def _resolve(base_path: str, href: str) -> str:
+    """Resolve href relative to base_path (an EPUB-internal file path)."""
+    href = href.split("#")[0]
+    if not href:
+        return ""
+    base_dir = base_path.rsplit("/", 1)[0] if "/" in base_path else ""
+    parts = (base_dir.split("/") if base_dir else []) + href.split("/")
+    out: list[str] = []
+    for p in parts:
+        if p in ("", "."):
+            continue
+        if p == "..":
+            if out:
+                out.pop()
+        else:
+            out.append(p)
+    return "/".join(out)
+
+
+def _read_toc_entries(zf: zipfile.ZipFile, opf_soup: BeautifulSoup, opf_path: str
+                      ) -> list[tuple[str, str]]:
+    """Return [(label, file_path), ...] in TOC order. EPUB3 nav preferred, NCX fallback."""
+    entries: list[tuple[str, str]] = []
+
+    # EPUB3 nav.xhtml
+    for item in opf_soup.find_all("item"):
+        if "nav" in (item.get("properties") or "").split():
+            nav_path = _resolve(opf_path, item.get("href", ""))
+            try:
+                nav_soup = BeautifulSoup(zf.read(nav_path), "html.parser")
+            except KeyError:
+                continue
+            toc_nav = (nav_soup.find("nav", attrs={"epub:type": "toc"})
+                       or nav_soup.find("nav"))
+            if toc_nav:
+                for a in toc_nav.find_all("a"):
+                    href = a.get("href", "")
+                    if not href:
+                        continue
+                    target = _resolve(nav_path, href)
+                    label = " ".join(a.get_text().split()).strip()
+                    if target:
+                        entries.append((label or target, target))
+            if entries:
+                return entries
+
+    # EPUB2 NCX
+    for item in opf_soup.find_all("item"):
+        if item.get("media-type") == "application/x-dtbncx+xml":
+            ncx_path = _resolve(opf_path, item.get("href", ""))
+            try:
+                ncx_soup = BeautifulSoup(zf.read(ncx_path), "xml")
+            except KeyError:
+                continue
+            for np in ncx_soup.find_all("navPoint"):
+                content = np.find("content")
+                text_el = np.find("navLabel")
+                text_el = text_el.find("text") if text_el else None
+                if not content:
+                    continue
+                src = content.get("src", "")
+                if not src:
+                    continue
+                target = _resolve(ncx_path, src)
+                label = " ".join(text_el.get_text().split()).strip() if text_el else target
+                if target:
+                    entries.append((label or target, target))
+            if entries:
+                return entries
+
+    return entries
+
+
+def _spine_order(opf_soup: BeautifulSoup, opf_path: str) -> list[str]:
+    """Return list of file paths in spine order."""
+    manifest: dict[str, str] = {}
+    for item in opf_soup.find_all("item"):
+        item_id = item.get("id", "")
+        if item_id:
+            manifest[item_id] = _resolve(opf_path, item.get("href", ""))
+    spine: list[str] = []
+    for ref in opf_soup.find_all("itemref"):
+        idref = ref.get("idref", "")
+        if idref in manifest and manifest[idref]:
+            spine.append(manifest[idref])
+    return spine
+
+
+def _discover_via_toc(epub_path: Path, *, skip_front_matter: bool = True
+                      ) -> tuple[dict[int, list[str]], dict[int, str]]:
+    """Use EPUB TOC + spine to map chapters → files. Returns (chapters, labels).
+
+    When skip_front_matter is True (default), TOC entries matching
+    _SKIP_LABEL_PATTERNS (Cover, Title Page, Copyright, TOC, Newsletter, …)
+    are dropped from the chapter numbering so chapter 1 = first real content.
+    Set False to recover the raw 1:1 TOC numbering (used by migration)."""
+    chapters: dict[int, list[str]] = {}
+    labels: dict[int, str] = {}
+    with zipfile.ZipFile(epub_path) as zf:
+        try:
+            container = BeautifulSoup(zf.read("META-INF/container.xml"), "xml")
+            opf_path = container.find("rootfile")["full-path"]
+        except (KeyError, TypeError):
+            return chapters, labels
+        opf_soup = BeautifulSoup(zf.read(opf_path), "xml")
+
+        toc_entries = _read_toc_entries(zf, opf_soup, opf_path)
+        spine = _spine_order(opf_soup, opf_path)
+        if not toc_entries or not spine:
+            return chapters, labels
+
+        # Dedup TOC by file (keep first label per unique file).
+        first_label: dict[str, str] = {}
+        toc_order: list[str] = []
+        for label, target in toc_entries:
+            if target not in first_label:
+                first_label[target] = label
+                toc_order.append(target)
+
+        # Walk spine; bump chapter number when we cross a TOC-start file.
+        chapter_num = 0
+        toc_set = set(toc_order)
+        in_skip = False
+        for spine_file in spine:
+            if spine_file in toc_set:
+                if skip_front_matter and _is_front_matter(first_label[spine_file]):
+                    in_skip = True
+                else:
+                    in_skip = False
+                    chapter_num += 1
+                    chapters[chapter_num] = [spine_file]
+                    labels[chapter_num] = first_label[spine_file]
+            elif chapter_num > 0 and not in_skip:
+                chapters[chapter_num].append(spine_file)
+            # else: pre-TOC spine files (rare) are skipped.
+
+    return chapters, labels
+
+
+def _discover_via_filename(epub_path: Path) -> dict[int, list[str]]:
+    """Fallback: match filenames containing 'chapterNNN'."""
     chapters: dict[int, list[str]] = {}
     with zipfile.ZipFile(epub_path) as zf:
         for name in sorted(zf.namelist()):
@@ -78,6 +234,25 @@ def discover_chapters(epub_path: Path) -> dict[int, list[str]]:
             n = int(m.group(1))
             chapters.setdefault(n, []).append(name)
     return chapters
+
+
+def discover_chapters(epub_path: Path) -> dict[int, list[str]]:
+    """Return {chapter_number: [xhtml_filenames in spine order]}.
+
+    Reads the EPUB TOC (nav.xhtml or NCX) and walks the spine to group
+    files into chapters. Falls back to filename matching ('chapterNNN')
+    for EPUBs without a usable TOC.
+    """
+    chapters, _ = _discover_via_toc(epub_path)
+    if chapters:
+        return chapters
+    return _discover_via_filename(epub_path)
+
+
+def discover_chapter_labels(epub_path: Path) -> dict[int, str]:
+    """Return {chapter_number: label} when TOC-based discovery is available."""
+    _, labels = _discover_via_toc(epub_path)
+    return labels
 
 
 def extract_chapter_text(epub_path: Path, file_names: list[str]) -> str:
@@ -354,7 +529,13 @@ def main() -> None:
         wanted = [int(args.chapters)]
 
     all_chapters = discover_chapters(args.epub)
-    print(f"[*] EPUB has chapters: {sorted(all_chapters)}")
+    chapter_labels = discover_chapter_labels(args.epub)
+    if chapter_labels:
+        print(f"[*] EPUB has {len(all_chapters)} chapters:")
+        for n in sorted(all_chapters):
+            print(f"      {n:3d}. {chapter_labels.get(n, '(no label)')}")
+    else:
+        print(f"[*] EPUB has chapters: {sorted(all_chapters)}")
     print(f"[*] Rendering: {wanted}, voice={args.voice}, book_id={args.book_id}")
 
     cast = None
