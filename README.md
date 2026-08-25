@@ -4,6 +4,9 @@ Convert any EPUB into a multi-voice audiobook using xAI's Grok TTS, then listen
 in the bundled web player with chapter navigation, variable speed (0.5×–4×),
 bookmarks, and a synchronized read-along view of the source text.
 
+In production use: **7 full novels rendered** at ~$2.50 per book — roughly 70×
+cheaper than ElevenLabs list pricing for comparable narration.
+
 You bring your own EPUB. The tool detects characters automatically, assigns
 voices by gender, and writes a single JSON config you can edit to override
 specific assignments.
@@ -16,7 +19,7 @@ EPUB ─▶ chapter HTML
       ─▶ heuristic dialogue attribution (with HIGH/MED/LOW/UNK confidence)
       ─▶ per-character voice mapping (gender-matched)
       ─▶ Grok TTS (parallel, segment-cached)
-      ─▶ ffmpeg concat per chapter
+      ─▶ per-chapter concat (ffmpeg when available, byte-concat fallback)
       ─▶ Flask web player
 ```
 
@@ -168,9 +171,13 @@ characters) only pay for the changed segments.
 | `attribution.py`         | Split text into `[(speaker, text, confidence), ...]` |
 | `text_preprocess.py`     | Pronunciation overrides, Roman numerals, abbreviation expansion |
 | `html_to_marked_text.py` | Walk EPUB HTML, preserve italics as `<emphasis>` |
-| `render_batch.py`        | Orchestrator: chunking, parallel TTS, ffmpeg concat, both single- and multi-voice modes |
+| `render_batch.py`        | Orchestrator: chunking, parallel TTS, per-chapter concat (ffmpeg with byte-concat fallback), both single- and multi-voice modes |
+| `qa_audio.py`            | Duration-anomaly QA: learns each voice's speaking rate from timing data, flags segments that rendered suspiciously long/short |
+| `qa_whisper.py`          | Whisper STT diff: transcribes rendered MP3s and diffs against source text, per segment |
 | `player/app.py`          | Flask backend: library, audio, text, HTML, progress, bookmarks |
 | `player/static/`         | Single-page HTML / JS / CSS player UI |
+| `demos/build_demo.py`    | Regenerates the demo clips end-to-end (~$0.07) |
+| `_migrate_renumber.py`   | One-shot maintenance script (chapter renumbering after front-matter filtering) |
 
 ## Roadmap
 
